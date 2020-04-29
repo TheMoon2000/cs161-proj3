@@ -112,7 +112,12 @@ func processLogout(response http.ResponseWriter, request *http.Request) {
 	// TODO: clear the session token cookie in the user's browser
 	// HINT: to clear a cookie, set its MaxAge to -1
 
+	cookie.MaxAge = -1
+	http.SetCookie(response, cookie)
+
 	// TODO: delete the session from the database
+
+	db.Exec("DELETE FROM sessions WHERE username = ?", username)
 
 	//////////////////////////////////
 	// END TASK 2: YOUR CODE HERE
