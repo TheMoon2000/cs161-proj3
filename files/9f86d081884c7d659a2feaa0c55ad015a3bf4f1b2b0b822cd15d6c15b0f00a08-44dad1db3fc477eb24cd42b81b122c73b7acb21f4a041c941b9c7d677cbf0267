@@ -1,0 +1,18 @@
+# you can write to stdout for debugging purposes, e.g.
+# print("this is a debug message")
+
+def solution(A):
+    # write your code in Python 3.6
+    
+    # This dictionary keeps the count of all previous occurrences of each element
+    tally = {}
+    pairs = 0
+
+    for i in A:
+        if i in tally: # tally contains key i
+            pairs += tally[i]
+            tally[i] += 1
+        else:
+            tally[i] = 1
+        
+    return min(pairs, 1000000000)

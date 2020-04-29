@@ -5,9 +5,11 @@ package main
 // Reminder that you're not allowed to import anything that isn't part of the Go standard library.
 // This includes golang.org/x/
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
-	_ "io/ioutil"
+	"io/ioutil"
 	"net/http"
 	_ "os"
 	_ "path/filepath"
@@ -134,9 +136,46 @@ func processUpload(response http.ResponseWriter, request *http.Request, username
 	//////////////////////////////////
 
 	// HINT: files should be stored in const filePath = "./files"
+	const filePath = "./files"
 
 	// replace this statement
-	fmt.Fprintf(response, "placeholder")
+	file, header, err := request.FormFile("file")
+
+	if err != nil {
+		fmt.Fprintf(response, "You didn't upload a file!")
+		return
+	}
+
+	// Check if file already exists for the user
+	row := db.QueryRow("SELECT username FROM files WHERE username = ? AND filename = ?", username, header.Filename)
+
+	var tmp string
+	err = row.Scan(tmp)
+	if err == nil {
+		fmt.Fprintf(response, "File already exists!")
+		return
+	}
+
+	// The file doesn't yet exist.
+	// Create the record in the database.
+	db.Exec("INSERT INTO files VALUES (?, ?)", username, header.Filename)
+
+	fileBytes, _ := ioutil.ReadAll(file)
+
+	// Use hashes to prevent bad file names and user names
+	userHash := sha256.Sum256([]byte(username))
+	fileHash := sha256.Sum256([]byte(header.Filename))
+	userHashString := hex.EncodeToString(userHash[:])
+	fileHashString := hex.EncodeToString(fileHash[:])
+
+	// File name format: {user hash}-{file name hash}
+	fileWriteErr := ioutil.WriteFile(filePath+"/"+userHashString+"-"+fileHashString, fileBytes, 0644)
+	if fileWriteErr != nil {
+		log.Fatal(fileWriteErr)
+	}
+
+	msg := fmt.Sprintf("Successfully uploaded file '%v'", header.Filename)
+	fmt.Fprintf(response, msg)
 
 	//////////////////////////////////
 	// END TASK 3: YOUR CODE HERE

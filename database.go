@@ -32,12 +32,13 @@ func createTables() {
 							salt TEXT
 							);
 		CREATE TABLE IF NOT EXISTS sessions (id INTEGER NOT NULL PRIMARY KEY,
-							   username TEXT,
-							   token TEXT,
-							   expires INTEGER
-							   );
+							username TEXT,
+							token TEXT,
+							expires INTEGER
+							);
 		CREATE TABLE IF NOT EXISTS files (id INTEGER NOT NULL PRIMARY KEY,
-							yourfield TEXT
+							username TEXT,
+							filename TEXT
 							);`
 	// TODO: modify the schema of the files table to help implement tasks 3-6.
 	// do NOT modify the schema of the sessions or users tables.
