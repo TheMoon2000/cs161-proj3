@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	_ "os"
+	"path/filepath"
 	_ "path/filepath"
 	"strings"
 	"text/template"
@@ -158,7 +159,7 @@ func processUpload(response http.ResponseWriter, request *http.Request, username
 
 	// The file doesn't yet exist.
 	// Create the record in the database.
-	db.Exec("INSERT INTO files VALUES (?, ?)", username, header.Filename)
+	db.Exec("INSERT INTO files VALUES (?, ?, ?)", username, username, header.Filename)
 
 	fileBytes, _ := ioutil.ReadAll(file)
 
@@ -199,8 +200,32 @@ func listFiles(response http.ResponseWriter, request *http.Request, username str
 	// TODO: for each of the user's files, add a
 	// corresponding fileInfo struct to the files slice.
 
-	// replace this line
-	fmt.Fprintf(response, "placeholder")
+	printTable(db, "users")
+	printTable(db, "sessions")
+	printTable(db, "files")
+
+	rows, err := db.Query("SELECT ownername, filename FROM files WHERE username = ?", username)
+	if err != nil {
+		fmt.Fprintf(response, "User has no files")
+		return
+	}
+
+	for rows.Next() {
+		var fname, fowner string
+		err = rows.Scan(&fowner, &fname)
+
+		userHash := sha256.Sum256([]byte(fowner))
+		userHashString := hex.EncodeToString(userHash[:])
+		fileHash := sha256.Sum256([]byte(fname))
+		fileHashString := hex.EncodeToString(fileHash[:])
+
+		if err != nil {
+			fmt.Fprintf(response, "Error")
+		}
+		fpath := filepath.Join("./files/", userHashString+"-"+fileHashString)
+		print(fpath)
+		files = append(files, fileInfo{Filename: fname, FileOwner: fowner, FilePath: fpath})
+	}
 
 	//////////////////////////////////
 	// END TASK 4: YOUR CODE HERE
@@ -223,16 +248,35 @@ func listFiles(response http.ResponseWriter, request *http.Request, username str
 
 func getFile(response http.ResponseWriter, request *http.Request, username string) {
 	fileString := strings.TrimPrefix(request.URL.Path, "/file/")
-
+	print(fileString)
 	_ = fileString
 
 	//////////////////////////////////
 	// BEGIN TASK 5: YOUR CODE HERE
 	//////////////////////////////////
+	fid := strings.TrimPrefix(fileString, "files/")
 
-	// replace this line
-	fmt.Fprintf(response, "placeholder")
-
+	rows, err := db.Query("SELECT ownername, filename FROM files WHERE username = ?", username)
+	if err != nil {
+		fmt.Fprintf(response, "User has no files")
+		return
+	}
+	for rows.Next() {
+		var fname, fowner string
+		err = rows.Scan(&fowner, &fname)
+		userHash := sha256.Sum256([]byte(fowner))
+		userHashString := hex.EncodeToString(userHash[:])
+		fileHash := sha256.Sum256([]byte(fname))
+		fileHashString := hex.EncodeToString(fileHash[:])
+		fpath := userHashString + "-" + fileHashString
+		if fpath == fid {
+			setNameOfServedFile(response, fname)
+			http.ServeFile(response, request, fileString)
+			return
+		}
+	}
+	//setNameOfServedFile(response, fname)
+	//http.ServeFile(response, request, fname)
 	//////////////////////////////////
 	// END TASK 5: YOUR CODE HERE
 	//////////////////////////////////
@@ -256,9 +300,28 @@ func processShare(response http.ResponseWriter, request *http.Request, sender st
 	//////////////////////////////////
 	// BEGIN TASK 6: YOUR CODE HERE
 	//////////////////////////////////
+	var rec string
+	row := db.QueryRow("SELECT username FROM users WHERE username = ?", recipient)
+	err := row.Scan(&rec)
+	if err != nil {
+		fmt.Fprintf(response, "User doesn't exist")
+		return
+	}
 
-	// replace this line
-	fmt.Fprintf(response, "placeholder")
+	var owner string
+	row = db.QueryRow("SELECT ownername FROM files WHERE username = ? AND filename = ? LIMIT 1", sender, filename)
+	err = row.Scan(&owner)
+	if err != nil {
+		fmt.Fprintf(response, "Error accessing db")
+		return
+	}
+	if sender != owner {
+		response.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(response, "You are not the owner")
+		return
+	}
+
+	db.Exec("INSERT INTO files VALUES (?, ?, ?)", recipient, sender, filename)
 
 	//////////////////////////////////
 	// END TASK 6: YOUR CODE HERE
